@@ -1,0 +1,128 @@
+{% extends "base_list.html" %}
+
+{% block content %}
+{{ block.super }}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Tabulator
+    var table = new Tabulator("#data-table", {
+        height: "500px",
+        layout: "fitColumns",
+        ajaxURL: "/api/sizes/",
+        ajaxConfig: "GET",
+        pagination: true,
+        paginationMode: "remote",
+        paginationSize: 10,
+        paginationSizeSelector: [10, 25, 50, 100],
+        paginationCounter: "rows",
+        ajaxFiltering: true,
+        ajaxSorting: true,
+        filterMode: "remote",
+        columns: [
+            {title:"Code", field:"code", headerFilter:"input", sorter:"number"},
+            {title:"Name", field:"name", headerFilter:"input", sorter:"string"},
+            {title:"Size Length", field:"size_length", headerFilter:"input", sorter:"number"},
+            {title:"Size Width", field:"size_width", headerFilter:"input", sorter:"number"},
+            {title:"Length (mm)", field:"length_in_mm", headerFilter:"input", sorter:"number"},
+            {title:"Width (mm)", field:"width_in_mm", headerFilter:"input", sorter:"number"},
+            {
+                title:"Unit",
+                field:"unit_code",
+                headerFilter:"input",
+                headerFilterParams:{values:{"": "All"}}
+            },
+            {
+                title: "Active",
+                field: "active", 
+                hozAlign: "center",
+                formatter: "tickCross",
+                headerFilter: "tickCross",
+                headerFilterParams: {"tristate": true}
+    }
+        ],
+
+        ajaxRequestFunc: function(url, config, params){
+            return new Promise(function(resolve, reject){
+                let query = new URLSearchParams();
+                query.append("page", params.page || 1);
+                query.append("page_size", params.size || 10);
+
+                console.log("Params:", params);
+
+                // Sorting
+                if(params.sort && params.sort.length > 0){
+                    params.sort.forEach(function(sorter){
+                        let dir = sorter.dir === "asc" ? "" : "-";
+                        query.append("ordering", dir + sorter.field);
+                    });
+                }
+
+                // Column filters
+                if(params.filter && params.filter.length > 0){
+                    params.filter.forEach(function(filter){
+                        if(filter.value !== undefined && filter.value !== null && filter.value !== ""){
+                            query.append(filter.field, filter.value);
+                        }
+                    });
+                }
+
+                // Global search
+                let globalValue = document.getElementById("globalSearch").value;
+                if(globalValue) query.append("global_search", globalValue);
+
+                let requestUrl = url + "?" + query.toString();
+                console.log("Request URL:", requestUrl);
+
+                // Make the actual fetch request
+                fetch(requestUrl, config)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log("Response data:", data);
+                        resolve(data);
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                        reject(error);
+                    });
+            });
+        },
+
+        ajaxResponse: function(url, params, response){
+            console.log("Total count:", response.count);
+            console.log("Current page size:", params.size);
+            
+            let lastPage = Math.ceil(response.count / params.size);
+            console.log("Last page:", lastPage);
+            
+            return {
+                last_page: lastPage,
+                data: response.results
+            };
+        },
+    });
+
+    // Populate Unit column dropdown dynamically
+    fetch("/api/sizes/")
+        .then(res => res.json())
+        .then(data => {
+            if(data.filters && data.filters.unit_code){
+                const unitOptions = {"": "All"};
+                data.filters.unit_code.forEach(u => unitOptions[u] = u);
+                table.updateColumnDefinition("unit_code", {
+                    headerFilterParams: { values: unitOptions }
+                });
+            }
+        });
+
+    // Global search debounce
+    var searchTimeout;
+    document.getElementById("globalSearch").addEventListener("input", function(){
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            table.setData();
+        }, 300);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Data List{% endblock %}</title>
+    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #globalSearch {
+            margin-bottom: 10px;
+            padding: 8px;
+            width: 300px;
+        }
+        #data-table {
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    {% block content %}
+    <h2>Size List</h2>
+    
+    <input id="globalSearch" type="text" placeholder="Global Search...">
+    
+    <div id="data-table"></div>
+    {% endblock %}
+    
+    <script src="https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
