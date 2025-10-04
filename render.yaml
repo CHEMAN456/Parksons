@@ -8,9 +8,12 @@ services:
     buildCommand: |
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
+      python manage.py migrate
     startCommand: gunicorn config.wsgi:application
     envVars:
       - key: SECRET_KEY
         value: 'django-insecure-m$y*je^!+vojmo30#-7#rfqy4ts!q!8iab#lf@kpi&q_)023am'
       - key: DEBUG
         value: "False"
+      - key: ALLOWED_HOSTS
+        value: "https://parksons.onrender.com,localhost,127.0.0.1"

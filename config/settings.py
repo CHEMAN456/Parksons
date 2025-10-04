@@ -25,7 +25,8 @@ SECRET_KEY = config("SECRET_KEY",default="unsafe-default")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG",default=False,cast=bool)
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
+ALLOWED_HOSTS_STR = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.split(",")]
 
 
 # Application definition
@@ -127,3 +128,12 @@ STATIC_ROOT = BASE_DIR/ 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# REST Framework settings (optional but recommended)
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+}
