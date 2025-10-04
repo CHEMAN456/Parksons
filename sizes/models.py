@@ -15,6 +15,8 @@ class Size(models.Model):
     
     class Meta:
         db_table = 'sizes'
+        ordering = ['code']
+        
         
     def __str__(self):
         return f"{self.name}({self.code})"
