@@ -9,6 +9,7 @@ services:
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
       python manage.py migrate
+      python manage.py createsuperuser --noinput || true
     startCommand: gunicorn config.wsgi:application
     envVars:
       - key: SECRET_KEY
@@ -17,3 +18,13 @@ services:
         value: "False"
       - key: ALLOWED_HOSTS
         value: "parksons.onrender.com,localhost,127.0.0.1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: parksons_db
+          property: connectionString
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: "admin"
+      - key: DJANGO_SUPERUSER_EMAIL
+        value: "admin@example.com"
+      - key: DJANGO_SUPERUSER_PASSWORD
+        value: "Admin@123"
