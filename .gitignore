@@ -8,7 +8,7 @@ __pycache__/
 # Virtual Environments
 venv/
 env/
-
+.env
 # Django
 *.log
 *.pot
