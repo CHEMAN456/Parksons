@@ -15,7 +15,7 @@ services:
       - key: SECRET_KEY
         value: 'django-insecure-m$y*je^!+vojmo30#-7#rfqy4ts!q!8iab#lf@kpi&q_)023am'
       - key: DEBUG
-        value: "False"
+        value: "True"  # Changed to True temporarily
       - key: ALLOWED_HOSTS
         value: "parksons.onrender.com,localhost,127.0.0.1"
       - key: DATABASE_URL
