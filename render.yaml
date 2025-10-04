@@ -11,6 +11,6 @@ services:
     startCommand: gunicorn config.wsgi:application
     envVars:
       - key: SECRET_KEY
-        generateValue: true
+        value: 'django-insecure-m$y*je^!+vojmo30#-7#rfqy4ts!q!8iab#lf@kpi&q_)023am'
       - key: DEBUG
         value: "False"
