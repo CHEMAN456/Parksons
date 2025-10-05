@@ -75,8 +75,8 @@ fetch("/api/sizes/")
                     editor:"list",
                     editorParams:{
                         values: {
-                            "true": "Active",
-                            "false": "Inactive"
+                            true: "Active",
+                            false: "Inactive"
                         }
                     }
                 }
@@ -163,6 +163,12 @@ fetch("/api/sizes/")
                     }
                 }
                 return cookieValue;
+            }
+            // Convert active column to boolean
+            if(data.active === "true" || data.active === true || data.active === 1 || data.active === "1"){
+                data.active = true;
+            } else {
+                data.active = false;
             }
             
             const csrftoken = getCookie('csrftoken');
