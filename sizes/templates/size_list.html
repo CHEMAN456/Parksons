@@ -6,123 +6,208 @@
 
 {% block scripts %}
 <script>
-    // Initialize Tabulator
-    var table = new Tabulator("#data-table", {
-        height: "500px",
-        layout: "fitColumns",
-        ajaxURL: "/api/sizes/",
-        ajaxConfig: "GET",
-        pagination: true,
-        paginationMode: "remote",
-        paginationSize: 10,
-        paginationSizeSelector: [10, 25, 50, 100],
-        paginationCounter: "rows",
-        ajaxFiltering: true,
-        ajaxSorting: true,
-        filterMode: "remote",
-        columns: [
-            {title:"Code", field:"code", headerFilter:"input", sorter:"number"},
-            {title:"Name", field:"name", headerFilter:"input", sorter:"string"},
-            {title:"Size Length", field:"size_length", headerFilter:"input", sorter:"number"},
-            {title:"Size Width", field:"size_width", headerFilter:"input", sorter:"number"},
-            {title:"Length (mm)", field:"length_in_mm", headerFilter:"input", sorter:"number"},
-            {title:"Width (mm)", field:"width_in_mm", headerFilter:"input", sorter:"number"},
-            {
-                title:"Unit",
-                field:"unit_code",
-                headerFilter:"input",
-                headerFilterParams:{values:{"": "All"}}
-            },
-            {
-                title: "Active",
-                field: "active", 
-                hozAlign: "center",
-                formatter: "tickCross",
-                headerFilter: "tickCross",
-                headerFilterParams: {"tristate": true}
-    }
-        ],
+console.log("Script starting...");
 
-        ajaxRequestFunc: function(url, config, params){
-            return new Promise(function(resolve, reject){
-                let query = new URLSearchParams();
-                query.append("page", params.page || 1);
-                query.append("page_size", params.size || 10);
+// Fetch initial filter data, then initialize Tabulator
+fetch("/api/sizes/")
+    .then(res => res.json())
+    .then(filterData => {
+        console.log("Filter data received:", filterData);
 
-                console.log("Params:", params);
+        // Build initial filter options from backend filters
+        let codeOptions   = {"": "All"};
+        let unitOptions   = {"": "All"};
+        let activeOptions = {"": "All"};
 
-                // Sorting
-                if(params.sort && params.sort.length > 0){
-                    params.sort.forEach(function(sorter){
-                        let dir = sorter.dir === "asc" ? "" : "-";
-                        query.append("ordering", dir + sorter.field);
-                    });
-                }
+        if(filterData.filters){
+            if(filterData.filters.code) filterData.filters.code.forEach(v => codeOptions[v] = v);
+            if(filterData.filters.unit_code) filterData.filters.unit_code.forEach(v => unitOptions[v] = v);
+            if(filterData.filters.active) filterData.filters.active.forEach(v => activeOptions[v] = v);
+        }
 
-                // Column filters
-                if(params.filter && params.filter.length > 0){
-                    params.filter.forEach(function(filter){
-                        if(filter.value !== undefined && filter.value !== null && filter.value !== ""){
-                            query.append(filter.field, filter.value);
-                        }
-                    });
-                }
+        // Build options from results for other fields
+        let nameOptions       = {"": "All"};
+        let sizeLengthOptions = {"": "All"};
+        let sizeWidthOptions  = {"": "All"};
+        let lengthMMOptions   = {"": "All"};
+        let widthMMOptions    = {"": "All"};
 
-                // Global search
-                let globalValue = document.getElementById("globalSearch").value;
-                if(globalValue) query.append("global_search", globalValue);
-
-                let requestUrl = url + "?" + query.toString();
-                console.log("Request URL:", requestUrl);
-
-                // Make the actual fetch request
-                fetch(requestUrl, config)
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log("Response data:", data);
-                        resolve(data);
-                    })
-                    .catch(error => {
-                        console.error("Error:", error);
-                        reject(error);
-                    });
+        if(filterData.results){
+            filterData.results.forEach(row => {
+                if(row.name && !nameOptions[row.name]) nameOptions[row.name] = row.name;
+                if(row.size_length && !sizeLengthOptions[row.size_length]) sizeLengthOptions[row.size_length] = row.size_length;
+                if(row.size_width && !sizeWidthOptions[row.size_width]) sizeWidthOptions[row.size_width] = row.size_width;
+                if(row.length_in_mm && !lengthMMOptions[row.length_in_mm]) lengthMMOptions[row.length_in_mm] = row.length_in_mm;
+                if(row.width_in_mm && !widthMMOptions[row.width_in_mm]) widthMMOptions[row.width_in_mm] = row.width_in_mm;
             });
-        },
+        }
 
-        ajaxResponse: function(url, params, response){
-            console.log("Total count:", response.count);
-            console.log("Current page size:", params.size);
-            
-            let lastPage = Math.ceil(response.count / params.size);
-            console.log("Last page:", lastPage);
-            
-            return {
-                last_page: lastPage,
-                data: response.results
-            };
-        },
-    });
+        // Initialize Tabulator
+        var table = new Tabulator("#data-table", {
+            height: "500px",
+            layout: "fitColumns",
+            ajaxURL: "/api/sizes/",
+            ajaxConfig: "GET",
+            pagination: true,
+            paginationMode: "remote",
+            paginationSize: 10,
+            paginationSizeSelector: [10, 25, 50, 100],
+            paginationCounter: "rows",
+            ajaxFiltering: true,
+            ajaxSorting: true,
+            filterMode: "remote",
+            columns: [
+                {title:"Code", field:"code", headerFilter:"list", headerFilterParams:{values: codeOptions}, headerFilterFunc:"=", sorter:"number", editor:false},
+                {title:"Name", field:"name", headerFilter:"list", headerFilterParams:{values: nameOptions}, headerFilterFunc:"=", editor:"input", sorter:"string"},
+                {title:"Size Length", field:"size_length", headerFilter:"list", headerFilterParams:{values: sizeLengthOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
+                {title:"Size Width", field:"size_width", headerFilter:"list", headerFilterParams:{values: sizeWidthOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
+                {title:"Length (mm)", field:"length_in_mm", headerFilter:"list", headerFilterParams:{values: lengthMMOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
+                {title:"Width (mm)", field:"width_in_mm", headerFilter:"list", headerFilterParams:{values: widthMMOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
+                {title:"Unit", field:"unit_code", headerFilter:"list", headerFilterParams:{values: unitOptions}, editor:"input", headerFilterFunc:"="},
+                {
+                    title:"Active", 
+                    field:"active", 
+                    hozAlign:"center", 
+                    formatter:"tickCross", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: {"":"All","true": "Active","false": "Inactive"}}, 
+                    headerFilterFunc:"=", 
+                    editor:"list",
+                    editorParams:{
+                        values: {
+                            "true": "Active",
+                            "false": "Inactive"
+                        }
+                    }
+                }
+            ],
 
-    // Populate Unit column dropdown dynamically
-    fetch("/api/sizes/")
-        .then(res => res.json())
-        .then(data => {
-            if(data.filters && data.filters.unit_code){
-                const unitOptions = {"": "All"};
-                data.filters.unit_code.forEach(u => unitOptions[u] = u);
-                table.updateColumnDefinition("unit_code", {
-                    headerFilterParams: { values: unitOptions }
+            ajaxRequestFunc: function(url, config, params){
+                return new Promise(function(resolve, reject){
+                    let query = new URLSearchParams();
+                    query.append("page", params.page || 1);
+                    query.append("page_size", params.size || 10);
+
+                    // Sorting
+                    if(params.sort && params.sort.length > 0){
+                        params.sort.forEach(sorter => {
+                            let dir = sorter.dir === "asc" ? "" : "-";
+                            query.append("ordering", dir + sorter.field);
+                        });
+                    }
+
+                    // Column filters
+                    if(params.filter && params.filter.length > 0){
+                        params.filter.forEach(filter => {
+                            if(filter.value !== undefined && filter.value !== null && filter.value !== ""){
+                                query.append(filter.field, filter.value);
+                            }
+                        });
+                    }
+
+                    // Global search
+                    let globalValue = document.getElementById("globalSearch").value;
+                    if(globalValue) query.append("global_search", globalValue);
+
+                    let requestUrl = url + "?" + query.toString();
+
+                    fetch(requestUrl, config)
+                        .then(response => response.json())
+                        .then(data => {
+                            // Update dropdown options dynamically for ALL filterable fields (cascading)
+                            let resultFields = ["name","size_length","size_width","length_in_mm","width_in_mm","unit_code"];
+                            resultFields.forEach(col => {
+                                let values = [...new Set(data.results.map(r => r[col]).filter(v => v))];
+                                let selectOptions = {"": "All"};
+                                values.forEach(v => selectOptions[v] = v);
+                                table.updateColumnDefinition(col, {
+                                    headerFilterParams: {values: selectOptions}
+                                });
+                            });
+
+                            resolve(data);
+                        })
+                        .catch(error => {
+                            console.error("Error fetching data:", error);
+                            reject(error);
+                        });
                 });
+            },
+
+            ajaxResponse: function(url, params, response){
+                let lastPage = Math.ceil(response.count / params.size);
+                return { last_page: lastPage, data: response.results };
             }
         });
 
-    // Global search debounce
-    var searchTimeout;
-    document.getElementById("globalSearch").addEventListener("input", function(){
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            table.setData();
-        }, 300);
-    });
+        // Attach cellEdited event listener AFTER table creation
+        table.on("cellEdited", function(cell){
+            console.log("=== CELL EDITED START ===");
+            console.log("Field:", cell.getField());
+            console.log("New value:", cell.getValue());
+            
+            let row = cell.getRow();
+            let data = row.getData();
+            console.log("Full row data:", data);
+            
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            
+            const csrftoken = getCookie('csrftoken');
+            const url = "/api/sizes/" + data.code + "/";
+            
+            console.log("Sending PATCH to:", url);
+            console.log("Data being sent:", JSON.stringify(data));
+            
+            fetch(url, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrftoken
+                },
+                body: JSON.stringify(data)
+            })
+            .then(res => {
+                console.log("Response received, status:", res.status);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(resp => {
+                console.log("=== UPDATE SUCCESSFUL ===");
+                console.log("Response:", resp);
+                alert("Saved successfully!");
+            })
+            .catch(err => {
+                console.error("=== UPDATE FAILED ===");
+                console.error("Error:", err);
+                alert("Failed to save: " + err.message);
+            });
+        });
+
+        console.log("Tabulator initialized");
+
+        // Global search debounce
+        let searchTimeout;
+        document.getElementById("globalSearch").addEventListener("input", function(){
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => table.setData(), 300);
+        });
+
+    })
+    .catch(error => console.error("Failed to load filter options:", error));
 </script>
 {% endblock %}

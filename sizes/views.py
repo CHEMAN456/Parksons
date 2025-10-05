@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView,RetrieveUpdateAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -15,38 +15,58 @@ class SizePagination(PageNumberPagination):
     page_size_query_param = "page_size"
     max_page_size = 100
 
+class SizeDetailView(RetrieveUpdateAPIView):
+    queryset = Size.objects.all()
+    serializer_class = SizeSerializer
+    lookup_field = "code"
+    
 # FilterSet with global search and individual field filters
 class SizeFilter(FilterSet):
     global_search = CharFilter(method='filter_global', label='Global Search')
     code = CharFilter(lookup_expr='icontains')
     name = CharFilter(lookup_expr='icontains')
-    size_length = CharFilter(lookup_expr='icontains')
-    size_width = CharFilter(lookup_expr='icontains')
-    length_in_mm = CharFilter(lookup_expr='icontains')
-    width_in_mm = CharFilter(lookup_expr='icontains')
+    size_length = CharFilter(lookup_expr='exact')  # Changed to exact
+    size_width = CharFilter(lookup_expr='exact')   # Changed to exact
+    length_in_mm = CharFilter(lookup_expr='exact') # Changed to exact
+    width_in_mm = CharFilter(lookup_expr='exact')  # Changed to exact
     unit_code = CharFilter(lookup_expr='icontains')
-    active = BooleanFilter(method='filter_active')
+    active = CharFilter(method='filter_active')
+    
+    def filter_active(self, queryset, name, value):
+        value_str = str(value).lower()
+        if value_str in ['true', '1']:
+            return queryset.filter(active=True)
+        elif value_str in ['false', '0']:
+            return queryset.filter(active=False)
+        return queryset
 
     def filter_global(self, queryset, name, value):
-        return queryset.filter(
+        val_lower = str(value).lower()
+        if val_lower in ['true', '1']:
+            active_val = True
+        elif val_lower in ['false', '0']:
+            active_val = False
+        else:
+            active_val = None
+
+        q = (
             Q(code__icontains=value) |
             Q(name__icontains=value) |
             Q(size_length__icontains=value) |
             Q(size_width__icontains=value) |
             Q(unit_code__icontains=value)
         )
-    def filter_active(self, queryset, name, value):
-        """Convert boolean true/false to Y/N for filtering"""
-        if value is True:
-            return queryset.filter(active="Y")
-        elif value is False:
-            return queryset.filter(active="N")
-        # If value is None (tristate empty), return all records
-        return queryset    
 
+        if active_val is not None:
+            queryset = queryset.filter(active=active_val)
+
+        return queryset.filter(q)
+
+        
     class Meta:
         model = Size
         fields = ['code', 'name', 'size_length', 'size_width', 'length_in_mm', 'width_in_mm', 'unit_code', 'active', 'global_search']
+
    
     
 class SizeListView(ListAPIView):
@@ -70,7 +90,10 @@ class SizeListView(ListAPIView):
         distinct_filters = {
             "code": list(queryset.values_list("code", flat=True).distinct().order_by('code')),
             "unit_code": list(queryset.values_list("unit_code", flat=True).distinct().order_by('unit_code')),
-            "active": list(queryset.values_list("active", flat=True).distinct().order_by('active')),
+            "active": [
+                {"value": True, "label": "Active"},
+                {"value": False, "label": "Inactive"}
+            ]
         }
 
         # Return paginated response if page exists

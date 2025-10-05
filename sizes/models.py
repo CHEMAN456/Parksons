@@ -11,7 +11,8 @@ class Size(models.Model):
     unit_code = models.CharField(max_length=4, blank=True, null=True)
     length_in_mm = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, db_column='length')
     width_in_mm = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, db_column='width')
-    active = models.CharField(db_column='ACT', max_length=1, blank=True, null=True)
+    active = models.BooleanField(db_column='ACT', default=True)
+
     
     class Meta:
         db_table = 'sizes'
