@@ -2,11 +2,34 @@
 
 {% block content %}
 {{ block.super }}
+
+<!-- Messages block -->
+{% if messages %}
+<div class="mb-3">
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+</div>
+
+{% endif %}
+<!-- Refresh Button -->
+{% comment %} <div class="mb-3">
+    <button id="refreshTable" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-sync-alt"></i> Refresh Table
+    </button>
+</div> {% endcomment %}
+<div id="data-table"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 console.log("Script starting...");
+
+// Cache for current filter values to avoid unnecessary updates
+let currentFilterValues = {};
 
 // Fetch initial filter data, then initialize Tabulator
 fetch("/api/sizes/")
@@ -16,30 +39,143 @@ fetch("/api/sizes/")
 
         // Build initial filter options from backend filters
         let codeOptions   = {"": "All"};
-        let unitOptions   = {"": "All"};
-        let activeOptions = {"": "All"};
-
-        if(filterData.filters){
-            if(filterData.filters.code) filterData.filters.code.forEach(v => codeOptions[v] = v);
-            if(filterData.filters.unit_code) filterData.filters.unit_code.forEach(v => unitOptions[v] = v);
-            if(filterData.filters.active) filterData.filters.active.forEach(v => activeOptions[v] = v);
-        }
-
-        // Build options from results for other fields
-        let nameOptions       = {"": "All"};
+        let nameOptions   = {"": "All"};
         let sizeLengthOptions = {"": "All"};
         let sizeWidthOptions  = {"": "All"};
         let lengthMMOptions   = {"": "All"};
         let widthMMOptions    = {"": "All"};
+        let unitOptions   = {"": "All"};
+        let activeOptions = {"": "All"};
 
-        if(filterData.results){
-            filterData.results.forEach(row => {
-                if(row.name && !nameOptions[row.name]) nameOptions[row.name] = row.name;
-                if(row.size_length && !sizeLengthOptions[row.size_length]) sizeLengthOptions[row.size_length] = row.size_length;
-                if(row.size_width && !sizeWidthOptions[row.size_width]) sizeWidthOptions[row.size_width] = row.size_width;
-                if(row.length_in_mm && !lengthMMOptions[row.length_in_mm]) lengthMMOptions[row.length_in_mm] = row.length_in_mm;
-                if(row.width_in_mm && !widthMMOptions[row.width_in_mm]) widthMMOptions[row.width_in_mm] = row.width_in_mm;
-            });
+        if(filterData.filters){
+            if(filterData.filters.code) {
+                filterData.filters.code.forEach(v => codeOptions[v] = v);
+            }
+            if(filterData.filters.name) {
+                filterData.filters.name.forEach(v => nameOptions[v] = v);
+            }
+            if(filterData.filters.size_length) {
+                filterData.filters.size_length.forEach(v => sizeLengthOptions[v] = v);
+            }
+            if(filterData.filters.size_width) {
+                filterData.filters.size_width.forEach(v => sizeWidthOptions[v] = v);
+            }
+            if(filterData.filters.length_in_mm) {
+                filterData.filters.length_in_mm.forEach(v => lengthMMOptions[v] = v);
+            }
+            if(filterData.filters.width_in_mm) {
+                filterData.filters.width_in_mm.forEach(v => widthMMOptions[v] = v);
+            }
+            if(filterData.filters.unit_code) {
+                filterData.filters.unit_code.forEach(v => unitOptions[v] = v);
+            }
+            if(filterData.filters.active) {
+                filterData.filters.active.forEach(v => {
+                    if(v === true) activeOptions["true"] = "Active";
+                    else if(v === false) activeOptions["false"] = "Inactive";
+                });
+            }
+        }
+
+        // Function to update column title with filter value
+        function updateColumnTitle(field, value){   
+            // Only update if value changed
+            if (currentFilterValues[field] === value) return;
+            currentFilterValues[field] = value;
+            
+            console.log("updateColumnTitle called - Field:", field, "Value:", value);
+            
+            const column = table.getColumn(field);
+            if (!column) {
+                console.error("Column not found:", field);
+                return;
+            }
+            
+            const baseTitles = {
+                "code": "Code",
+                "name": "Name",
+                "size_length": "Size Length",
+                "size_width": "Size Width",
+                "length_in_mm": "Length (mm)",
+                "width_in_mm": "Width (mm)",
+                "unit_code": "Unit",
+                "active": "Active"
+            };
+            
+            let newTitle = baseTitles[field] || field;
+            
+            if(value && value !== "" && value !== "All"){
+                if (field === "active") {
+                    const displayValue = value === "true" ? "Active" : "Inactive";
+                    newTitle += ` (${displayValue})`;
+                } else {
+                    newTitle += ` (${value})`;
+                }
+            }
+            
+            console.log("Updating title to:", newTitle);
+            column.updateDefinition({title: newTitle});
+        }
+
+        // Function to update dropdown display
+        function updateFilterDisplay(field, value) {
+            // Only update if value changed
+            if (currentFilterValues[field] === value) return;
+            
+            setTimeout(() => {
+                const column = table.getColumn(field);
+                if (!column) return;
+        
+                const headerElement = column.getElement();
+                const selectElement = headerElement.querySelector("select");
+        
+                if (selectElement) {
+                    // Only update DOM if value actually changed
+                    if (selectElement.value !== value) {
+                        selectElement.value = value || "";
+                
+                        // Visual feedback
+                        if (value && value !== "" && value !== "All") {
+                            selectElement.style.background = "#e3f2fd";
+                            selectElement.style.borderColor = "#2196f3";
+                            selectElement.style.fontWeight = "bold";
+                        } else {
+                            selectElement.style.background = "";
+                            selectElement.style.borderColor = "";
+                            selectElement.style.fontWeight = "";
+                        }
+                    }
+            
+                    console.log("Updated dropdown for", field, "to value:", value);
+                }
+            }, 10);
+        }
+
+        // Refresh table function - SAFE VERSION
+        function setupRefreshButton() {
+            const refreshBtn = document.getElementById('refreshTable');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function() {
+                    console.log("Refreshing table...");
+
+                    // Clear global search
+                    const globalSearch = document.getElementById("globalSearch");
+                    if (globalSearch) globalSearch.value = "";
+
+                    // Clear filters and reload data
+                    table.clearHeaderFilter();
+                    table.setPage(1);
+
+                    // Simple refresh
+                    setTimeout(() => {
+                        table.setData(); // Reload from /api/sizes/
+                    }, 100);
+                });
+            } else {
+                console.warn("Refresh button not found — retrying...");
+                // Retry after short delay in case DOM is still rendering
+                setTimeout(setupRefreshButton, 500);
+            }
         }
 
         // Initialize Tabulator
@@ -57,22 +193,71 @@ fetch("/api/sizes/")
             ajaxSorting: true,
             filterMode: "remote",
             columns: [
-                {title:"Code", field:"code", headerFilter:"list", headerFilterParams:{values: codeOptions}, headerFilterFunc:"=", sorter:"number", editor:false},
-                {title:"Name", field:"name", headerFilter:"list", headerFilterParams:{values: nameOptions}, headerFilterFunc:"=", editor:"input", sorter:"string"},
-                {title:"Size Length", field:"size_length", headerFilter:"list", headerFilterParams:{values: sizeLengthOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
-                {title:"Size Width", field:"size_width", headerFilter:"list", headerFilterParams:{values: sizeWidthOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
-                {title:"Length (mm)", field:"length_in_mm", headerFilter:"list", headerFilterParams:{values: lengthMMOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
-                {title:"Width (mm)", field:"width_in_mm", headerFilter:"list", headerFilterParams:{values: widthMMOptions}, headerFilterFunc:"=", editor:"input", sorter:"number"},
-                {title:"Unit", field:"unit_code", headerFilter:"list", headerFilterParams:{values: unitOptions}, editor:"input", headerFilterFunc:"="},
+                {
+                    title:"Code", 
+                    field:"code", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: codeOptions}, 
+                    headerFilterFunc:"=", 
+                    sorter:"number", 
+                    editor:false
+                },
+                {
+                    title:"Name", 
+                    field:"name", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: nameOptions}, 
+                    headerFilterFunc:"=", 
+                    editor:"input", 
+                    sorter:"string"
+                },
+                {
+                    title:"Size Length", 
+                    field:"size_length", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: sizeLengthOptions}, 
+                    headerFilterFunc:"=", 
+                    sorter:"number"
+                },
+                {
+                    title:"Size Width", 
+                    field:"size_width", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: sizeWidthOptions}, 
+                    headerFilterFunc:"=", 
+                    sorter:"number"
+                },
+                {
+                    title:"Length (mm)", 
+                    field:"length_in_mm", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: lengthMMOptions}, 
+                    headerFilterFunc:"=", 
+                    sorter:"number"
+                },
+                {
+                    title:"Width (mm)", 
+                    field:"width_in_mm", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: widthMMOptions}, 
+                    headerFilterFunc:"=", 
+                    sorter:"number"
+                },
+                {
+                    title:"Unit", 
+                    field:"unit_code", 
+                    headerFilter:"list", 
+                    headerFilterParams:{values: unitOptions}, 
+                    headerFilterFunc:"="
+                },
                 {
                     title:"Active", 
                     field:"active", 
                     hozAlign:"center", 
                     formatter:"tickCross", 
                     headerFilter:"list", 
-                    headerFilterParams:{values: {"":"All","true": "Active","false": "Inactive"}}, 
+                    headerFilterParams:{values: activeOptions}, 
                     headerFilterFunc:"=", 
-                    editor:"list",
                     editorParams:{
                         values: {
                             true: "Active",
@@ -88,6 +273,21 @@ fetch("/api/sizes/")
                     query.append("page", params.page || 1);
                     query.append("page_size", params.size || 10);
 
+                    // Store current values before making request
+                    const currentValues = {};
+                    if(params.filter && params.filter.length > 0){
+                        params.filter.forEach(filter => {
+                            if(filter.value !== undefined && filter.value !== null && filter.value !== ""){
+                                query.append(filter.field, filter.value);
+                                currentValues[filter.field] = filter.value;
+                                console.log("Applying filter - Field:", filter.field, "Value:", filter.value);
+                            }
+                        });
+                    }
+
+                    // Store current values for reapplication
+                    const storedValues = {...currentValues};
+
                     // Sorting
                     if(params.sort && params.sort.length > 0){
                         params.sort.forEach(sorter => {
@@ -96,38 +296,80 @@ fetch("/api/sizes/")
                         });
                     }
 
-                    // Column filters
-                    if(params.filter && params.filter.length > 0){
-                        params.filter.forEach(filter => {
-                            if(filter.value !== undefined && filter.value !== null && filter.value !== ""){
-                                query.append(filter.field, filter.value);
-                            }
-                        });
-                    }
-
                     // Global search
                     let globalValue = document.getElementById("globalSearch").value;
                     if(globalValue) query.append("global_search", globalValue);
 
                     let requestUrl = url + "?" + query.toString();
+                    console.log("Making API request to:", requestUrl);
 
-                    fetch(requestUrl, config)
-                        .then(response => response.json())
+                    // Use faster timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    
+                    fetch(requestUrl, {...config, signal: controller.signal})
+                        .then(response => {
+                            clearTimeout(timeoutId);
+                            return response.json();
+                        })
                         .then(data => {
-                            // Update dropdown options dynamically for ALL filterable fields (cascading)
-                            let resultFields = ["name","size_length","size_width","length_in_mm","width_in_mm","unit_code"];
-                            resultFields.forEach(col => {
-                                let values = [...new Set(data.results.map(r => r[col]).filter(v => v))];
-                                let selectOptions = {"": "All"};
-                                values.forEach(v => selectOptions[v] = v);
-                                table.updateColumnDefinition(col, {
-                                    headerFilterParams: {values: selectOptions}
+                            // Update dropdowns from the filters object (entire filtered dataset)
+                            if(data.filters){
+                                let filterFields = ["code","name", "size_length", "size_width", "length_in_mm", "width_in_mm", "unit_code"];
+
+                                filterFields.forEach(col => {
+                                    if(data.filters[col]){
+                                        let selectOptions = {"": "All"};
+                                        data.filters[col].forEach(v => {
+                                            selectOptions[v] = v;
+                                        });
+                                        
+                                        // Only update if options changed
+                                        const currentValue = storedValues[col];
+                                        table.updateColumnDefinition(col, {
+                                            headerFilterParams: {values: selectOptions}
+                                        });
+
+                                        // Reapply previously selected value if any
+                                        if (currentValue !== undefined && currentValue !== null && currentValue !== "") {
+                                            setTimeout(() => {
+                                                table.setHeaderFilterValue(col, currentValue);
+                                                updateFilterDisplay(col, currentValue);
+                                            }, 0);
+                                        }
+                                    }
                                 });
-                            });
+
+                                // Handle active field separately
+                                if(data.filters.active){
+                                    const currentActiveFilter = storedValues["active"];
+                                    
+                                    let activeOpts = {"": "All"};
+                                    data.filters.active.forEach(item => {
+                                        if(item.value === true || item.value === "true") {
+                                            activeOpts["true"] = item.label || "Active";
+                                        }    
+                                        else if(item.value === false || item.value === "false") {
+                                            activeOpts["false"] = "Inactive";
+                                        }    
+                                    });
+                                    table.updateColumnDefinition("active", {
+                                        headerFilterParams: {values: activeOpts}
+                                    });
+                                    
+                                    if (currentActiveFilter !== undefined && currentActiveFilter !== null && currentActiveFilter !== "") {
+                                        setTimeout(() => {
+                                            table.setHeaderFilterValue("active", currentActiveFilter);
+                                            updateFilterDisplay("active", currentActiveFilter);
+                                        }, 0);
+                                    }
+                                }
+                            }
 
                             resolve(data);
                         })
                         .catch(error => {
+                            clearTimeout(timeoutId);
                             console.error("Error fetching data:", error);
                             reject(error);
                         });
@@ -140,80 +382,60 @@ fetch("/api/sizes/")
             }
         });
 
-        // Attach cellEdited event listener AFTER table creation
-        table.on("cellEdited", function(cell){
-            console.log("=== CELL EDITED START ===");
-            console.log("Field:", cell.getField());
-            console.log("New value:", cell.getValue());
-            
-            let row = cell.getRow();
-            let data = row.getData();
-            console.log("Full row data:", data);
-            
-            function getCookie(name) {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
-                }
-                return cookieValue;
-            }
-            // Convert active column to boolean
-            if(data.active === "true" || data.active === true || data.active === 1 || data.active === "1"){
-                data.active = true;
-            } else {
-                data.active = false;
-            }
-            
-            const csrftoken = getCookie('csrftoken');
-            const url = "/api/sizes/" + data.code + "/";
-            
-            console.log("Sending PATCH to:", url);
-            console.log("Data being sent:", JSON.stringify(data));
-            
-            fetch(url, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrftoken
-                },
-                body: JSON.stringify(data)
-            })
-            .then(res => {
-                console.log("Response received, status:", res.status);
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then(resp => {
-                console.log("=== UPDATE SUCCESSFUL ===");
-                console.log("Response:", resp);
-                alert("Saved successfully!");
-            })
-            .catch(err => {
-                console.error("=== UPDATE FAILED ===");
-                console.error("Error:", err);
-                alert("Failed to save: " + err.message);
+        // Add event listeners AFTER table creation
+        table.on("tableBuilt", function(){
+            console.log("Table built successfully");
+
+            // SETUP REFRESH BUTTON HERE - MOVED FROM INSIDE THE CONFIG OBJECT
+            setupRefreshButton();
+
+            // Debounced filter update
+            let filterTimeout;
+            table.on("headerFilterChanged", function(column, value){
+                clearTimeout(filterTimeout);
+                filterTimeout = setTimeout(() => {
+                    updateFilterDisplay(column.getField(), value);
+                }, 5);
             });
+
+            // Faster data loaded handler
+            table.on("dataLoaded", function(data){
+                setTimeout(() => {
+                    const currentFilters = table.getHeaderFilters();
+                    currentFilters.forEach(filter => {
+                        if (filter.value !== undefined && filter.value !== "" && filter.value !== "All") {
+                            updateFilterDisplay(filter.field, filter.value);
+                        } else {
+                            updateFilterDisplay(filter.field, "");
+                        }
+                    });
+                }, 25);
+            });
+
+            // Faster initialization
+            setTimeout(() => {
+                const currentFilters = table.getHeaderFilters();
+                currentFilters.forEach(filter => {
+                    updateFilterDisplay(filter.field, filter.value);
+                });
+            }, 150);
         });
 
-        console.log("Tabulator initialized");
+        table.on("rowClick",function(e,row){
+            const data = row.getData();
+            window.location.href = `detail/${data.code}/`;
+        });
 
-        // Global search debounce
+        // Global search with optimized debounce
         let searchTimeout;
         document.getElementById("globalSearch").addEventListener("input", function(){
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => table.setData(), 300);
+            searchTimeout = setTimeout(() => table.setData(), 400);
         });
 
     })
     .catch(error => console.error("Failed to load filter options:", error));
 </script>
 {% endblock %}
+
+

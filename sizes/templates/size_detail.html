@@ -1,0 +1,39 @@
+{% extends "base_list.html" %}
+{% comment %} {% load crispy_forms_tags %}  <!-- Optional if using crispy forms --> {% endcomment %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h3 class="mb-0">Edit Size - {{ object.code }}</h3>
+    </div>
+
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Code</label>
+            <input type="text" value="{{ object.code }}" class="form-control" readonly>
+          </div>
+
+          {% for field in form %}
+            <div class="col-md-6">
+              <label class="form-label fw-bold">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}
+                <div class="text-danger small">{{ field.errors }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="mt-4">
+          <button type="submit" class="btn btn-success px-4">Save Changes</button>
+          <a href="{% url 'size-list-page' %}" class="btn btn-outline-secondary px-4">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

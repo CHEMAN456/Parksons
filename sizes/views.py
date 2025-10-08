@@ -4,9 +4,12 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Q
-from django.views.generic import TemplateView
+from django.contrib import messages
+from django.views.generic import UpdateView,TemplateView
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter, BooleanFilter
+from django.urls import reverse_lazy
 from .models import Size
+from .forms import SizeForm
 from .serializers import SizeSerializer
 
 # Custom pagination
@@ -89,6 +92,11 @@ class SizeListView(ListAPIView):
         # Prepare distinct filter values from the filtered queryset
         distinct_filters = {
             "code": list(queryset.values_list("code", flat=True).distinct().order_by('code')),
+            "name": list(queryset.values_list("name", flat=True).distinct().order_by('name')),
+            "size_length": [str(v) for v in queryset.values_list("size_length",flat = True).distinct().order_by('size_length') if v],
+            "size_width": [str(v) for v in queryset.values_list("size_width",flat = True).distinct().order_by('size_width') if v],
+            "length_in_mm": [str(v) for v in queryset.values_list("length_in_mm",flat = True).distinct().order_by('length_in_mm') if v],
+            "width_in_mm": [str(v) for v in queryset.values_list("width_in_mm",flat = True).distinct().order_by('width_in_mm') if v],
             "unit_code": list(queryset.values_list("unit_code", flat=True).distinct().order_by('unit_code')),
             "active": [
                 {"value": True, "label": "Active"},
@@ -111,3 +119,16 @@ class SizeListView(ListAPIView):
         
 class SizeListPageView(TemplateView):
     template_name = "size_list.html"
+
+class SizeDetailPageView(UpdateView):
+    model = Size
+    form_class = SizeForm
+    template_name = "size_detail.html"
+    pk_url_kwarg = "code"
+    success_url = reverse_lazy("size-list-page")  
+    
+    def form_valid(self,form):
+        messages.success(self.request,f"Code {form.instance.code} updated successfully!") 
+        return super().form_valid(form)
+    
+    
